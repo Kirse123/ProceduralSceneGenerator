@@ -28,6 +28,7 @@ public class MapGenerator : MonoBehaviour
     private Mesh m_meshWall;
 
     private int[,] m_map;
+    private MapDataGenerator2D.MapCell[,] m_cellMap;
     
     public void Start()
     {

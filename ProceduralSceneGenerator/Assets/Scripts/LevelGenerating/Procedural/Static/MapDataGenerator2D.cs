@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace SurroundingGenerating
 {
@@ -23,6 +24,17 @@ namespace SurroundingGenerating
             FillMapRandomly(ref map, wallDensity, noiseFunction);
         }
 
+        public static void InitMap(ref MapCell[,] map, Vector2Int mapSize, float wallDensity, NoiseFunction noiseFunction = null)
+        {
+            map = new MapCell[mapSize.x, mapSize.y];
+            if (noiseFunction == null)
+            {
+                noiseFunction = DefaultNoiseFunc;
+            }
+
+
+        }
+
         private static void FillMapRandomly(ref int[,] map, float wallDensity, NoiseFunction noiseFunction = null)
         {
             if (noiseFunction == null)
@@ -37,6 +49,28 @@ namespace SurroundingGenerating
                 {                
                     var rndVal = noiseFunction(i, j);
                     map[i, j] = IsOnEdge(size, new Vector2Int(i, j)) || rndVal > (1f - wallDensity) ? 1 : 0;
+                }
+            }
+        }
+
+        private static void FillMapRandomly(ref MapCell[,] map, float wallDensity, NoiseFunction noiseFunction = null)
+        {
+            if (noiseFunction == null)
+            {
+                noiseFunction = DefaultNoiseFunc;
+            }
+
+            var size = new Vector2Int(map.GetLength(0), map.GetLength(1));
+            for (int i = 0; i < size.x; ++i)
+            {
+                for (int j = 0; j < size.y; ++j)
+                {
+                    var rndVal = noiseFunction(i, j);
+                    bool edgeCell = IsOnEdge(size, new Vector2Int(i, j), out bool cornerCell);
+                    int value = edgeCell || rndVal > (1f - wallDensity) ? 1 : 0;
+
+                    int neighbourCount = cornerCell ? 3 : (edgeCell ? 5 : 8);
+                    map[i, j] = new MapCell(new Vector2Int(i, j), value, neighbourCount);
                 }
             }
         }
@@ -80,6 +114,15 @@ namespace SurroundingGenerating
             return coord.x == 0 || coord.x == size.x -1 || coord.y == 0 || coord.y == size.y - 1;
         }
 
+        private static bool IsOnEdge(Vector2Int size, Vector2Int coord, out bool isInCorner)
+        {
+            bool edge = IsOnEdge(size, coord);
+            isInCorner = edge && ((coord.x == 0 || coord.x == size.x - 1) && (coord.y == 0 || coord.y == size.y - 1));
+
+            return edge;
+
+        }
+
         private static int GetSurroundingWallsCount(int[,] map, int gridX, int gridY)
         {
             int wallsCount = 0;
@@ -114,6 +157,65 @@ namespace SurroundingGenerating
             for (int i = 0; i < smoothCycles; ++i)
             {
                 SmoothMap(ref map, smoothParam);
+            }
+        }
+
+        public struct MapCell
+        {
+            public Vector2Int coordinates { get; private set; }
+            public int value { get; private set; }
+            public MapCell[] neighbours { get; set; }
+            public List<Vector2Int> neighboursIDs { get; private set; }
+
+            public MapCell(Vector2Int coords, int val, int neighbourCount, params MapCell[] neighbours) : this(coords, val, neighbourCount)
+            {
+
+                this.neighbours = neighbours == null ? this.neighbours : neighbours;
+            }
+
+            public MapCell(Vector2Int coords, int val, int neighbourCount)
+            {
+                this.coordinates = coords;
+                this.value = val;
+
+                this.neighbours = new MapCell[neighbourCount];
+                this.neighboursIDs = new List<Vector2Int>(neighbourCount);
+            }
+        }
+
+        private class CelledMapGrid
+        {
+            private MapCell[,] m_cells;
+
+            public CelledMapGrid(Vector2Int size)
+            {
+                m_cells = new MapCell[size.x, size.y];
+            }
+
+            public void InitCellsNeighboursIDs()
+            {
+                Vector2Int size = new Vector2Int(m_cells.GetLength(0), m_cells.GetLength(1));
+
+                for (int i = 0; i < size.x; ++i)
+                {
+                    for (int j = 0; j < size.y; ++j)
+                    {
+                        for (int x = i - 1; x <= i + 1 && x < size.x; ++x)
+                        {
+                            for (int y = j - 1; y <= j + 1 && y < size.y; ++y)
+                            {
+                                if ((i == x || j == y) || (x < 0 || y < 0))
+                                {
+                                    continue;
+                                }
+                                else
+                                {
+                                    m_cells[i, j].neighboursIDs.Add(new Vector2Int(x, y));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
